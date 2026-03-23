@@ -172,24 +172,61 @@ public class ScrapeServiceImpl implements ScrapeService {
                     String bodyText = doc.body().text();
                     String lowerBody = bodyText.toLowerCase();
                     String lowerKeyword = keyword.toLowerCase();
-
+                    
                     if (lowerBody.contains(lowerKeyword)) {
-                        int index = lowerBody.indexOf(lowerKeyword);
-                        int start = Math.max(0, index - 100);
-                        int end = Math.min(bodyText.length(),
-                                index + 200);
-                        String snippet = bodyText.substring(start, end);
-
-                        scrapedItems.add(new ScrapedDataHolder(
-                                url, lowerKeyword, snippet));
-                        totalBytes += snippet.getBytes().length;
-
-                        log.info("Match found: keyword='{}' url='{}'",
-                                lowerKeyword, url);
-                    } else {
-                        log.info("No match: keyword='{}' url='{}'",
-                                lowerKeyword, url);
-                    }
+                            // Find ALL occurrences — one DB row per match
+                            int searchFrom = 0;
+                            int occurrenceCount = 0;
+                                        
+                            while (searchFrom < lowerBody.length()) {
+                                int index = lowerBody.indexOf(lowerKeyword, searchFrom);
+                        
+                                // No more occurrences found
+                                if (index == -1) break;
+                        
+                                // Skip TOC area — first 500 chars usually navigation
+                                if (index < 500 && occurrenceCount == 0) {
+                                    searchFrom = index + lowerKeyword.length();
+                                    continue;
+                                }
+                        
+                                // Extract snippet around this occurrence
+                                int start = Math.max(0, index - 150);
+                                int end = Math.min(bodyText.length(), index + 300);
+                                String snippet = bodyText.substring(start, end);
+                        
+                                scrapedItems.add(new ScrapedDataHolder(
+                                        url, lowerKeyword, snippet));
+                                totalBytes += snippet.getBytes().length;
+                                occurrenceCount++;
+                                
+                                log.info("Match #{} found: keyword='{}' url='{}'",
+                                        occurrenceCount, lowerKeyword, url);
+                                
+                                // Move past current match
+                                searchFrom = index + lowerKeyword.length();
+                            }
+                    
+                            // Fallback — if all occurrences were in TOC area
+                            // grab the very first one anyway
+                            if (occurrenceCount == 0) {
+                                int index = lowerBody.indexOf(lowerKeyword);
+                                int start = Math.max(0, index - 150);
+                                int end = Math.min(bodyText.length(), index + 300);
+                                String snippet = bodyText.substring(start, end);
+                        
+                                scrapedItems.add(new ScrapedDataHolder(
+                                        url, lowerKeyword, snippet));
+                                totalBytes += snippet.getBytes().length;
+                                
+                                log.info("Match found (TOC fallback): keyword='{}' url='{}'",
+                                        lowerKeyword, url);
+                            }
+                    
+                        } else {
+                            log.info("No match: keyword='{}' url='{}'",
+                                    lowerKeyword, url);
+                        }
 
                 } catch (Exception e) {
                     log.error("Failed to scrape URL: {} | Error: {}",

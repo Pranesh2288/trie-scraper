@@ -35,7 +35,7 @@ Ensure the following are installed on your machine:
 ### 1. Clone the repository
 
 ```
-git clone https://github.com/your-username/trie-scraper
+git clone https://github.com/Pranesh2288/trie-scraper
 cd trie-scraper
 ```
 
